@@ -1,9 +1,10 @@
 #pragma once
 
-#include "UserConfig.h"
+#include "UserConfig.hpp"
 #define ARDUINOJSON_USE_LONG_LONG 0
 #define ARDUINOJSON_USE_DOUBLE 0
 #include "ArduinoJson.hpp"
+#include "LiquidCrystal_I2C.h"
 
 // Handle getting splitgate player data from tracker.gg and display it on the screen.
 
@@ -77,7 +78,7 @@ static int RxBufferLen;
 // Statically defined document for the JSON document
 static StaticJsonDocument<JSON_DOC_SIZE> doc;
 
-//LiquidCrystal_I2C //lcd(0x3f, 16, 2);
+static LiquidCrystal_I2C DisplayController;
 
 static PlayerDataStruct PlayerData;
 

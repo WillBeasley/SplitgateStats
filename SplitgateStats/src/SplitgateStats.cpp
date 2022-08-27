@@ -5,7 +5,7 @@
 #include <string>
 #include <sstream>
 #include "LiquidCrystal_I2C.h"
-#include "UserConfig.h"
+#include "UserConfig.hpp"
 #include "WiFi.h"
 #include "Wire.h"
 #include <HTTPClient.h>
@@ -17,12 +17,20 @@ void* CSplitgateStats::pRxBuffer = NULL;
 int CSplitgateStats::RxBufferLen = 0;
 StaticJsonDocument<(16 * 1024)> CSplitgateStats::doc;
 unsigned long CSplitgateStats::lastPollTime = millis() - POLLING_DELAY;
+LiquidCrystal_I2C CSplitgateStats::DisplayController(0x3f, 16, 2);
 
 // Namespaces for ArduinoJson, I don't like this but it makes the rest of the code cleaner
 using namespace ArduinoJson;
 using namespace DeserializationOption;
 
 void CSplitgateStats::Initialise(){
+
+    // Initialise I2C control on pin 14 and 15 for SCL/SDA respectively
+    Wire.begin(14,15);
+    DisplayController.init(); 
+    DisplayController.backlight();
+    DisplayController.clear();
+    DisplayController.print("Splitgate Stats V1.0");
 
     // Create a buffer in PSRAM for the HTTP response, and zero initialise it
     pRxBuffer = heap_caps_malloc(BUFFER_SIZE, MALLOC_CAP_SPIRAM);
@@ -31,17 +39,21 @@ void CSplitgateStats::Initialise(){
     // Mark the buffer as empty
     RxBufferLen = 0;
 
+    DisplayController.clear();
+    DisplayController.print("Connecting");
+
     // Startup wifi connection
     WiFi.begin(USER_SSID, USER_SSID_PASSWORD);
-
+    
     // Wait to be connected
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.print(".");
+        DisplayController.print(".");
+        //Serial.print(".");
     }
 
     // We are connected report our IP
-    Serial.println("WiFi connected");
+    //Serial.println("WiFi connected");
 
 }
 
@@ -57,21 +69,21 @@ void CSplitgateStats::MainLoop(){
                 ParseJSON();
             }
 
-            // Update the display with the latest info
-            UpdateLCD();
-
         } else {
             // If for some reason we are disconnected attempt to reconnect
             WiFi.begin(USER_SSID, USER_SSID_PASSWORD);
-            //lcd.clear();
-            //lcd.setCursor(0, 0);
-            //lcd.print("Connecting");
+            DisplayController.clear();
+            DisplayController.print("re-connecting");
             while (WiFi.status() != WL_CONNECTED) {
-                //lcd.print(".");
+                DisplayController.print(".");
                 delay(500);
             }
         }
     }
+
+    // Update the display with the latest info
+    UpdateLCD();
+
 }
 
 
@@ -87,7 +99,7 @@ bool CSplitgateStats::RefreshData(){
     http.begin(TRACKER_GG_URL);
     http.addHeader("TRN-Api-Key", TRACKER_GG_API_KEY);
 
-    Serial.println("Polling API for stats");
+    //Serial.println("Polling API for stats");
 
     // Send the HTTP GET request to the API
     int httpCode = http.GET();
@@ -99,7 +111,7 @@ bool CSplitgateStats::RefreshData(){
         // after 1s
         http.getStreamPtr()->setTimeout(30);
 
-        Serial.print("Receiving Response");
+        //Serial.print("Receiving Response");
 
         http.getStream().readBytes(reinterpret_cast<uint8_t*>(pRxBuffer), (BUFFER_SIZE)); 
 
@@ -143,17 +155,17 @@ bool CSplitgateStats::RefreshData(){
             runningOffset += 2;
 
             // Some indication to the console that something is happening
-            Serial.print(".");            
+            //Serial.print(".");            
 
         }  
 
-        Serial.println();
+        //Serial.println();
 
         RxBufferLen = payloadBufferIndex;
         ret = true;
 
     } else {
-        Serial.println(http.errorToString(httpCode));
+        //Serial.println(http.errorToString(httpCode));
     }
 
     // Make sure we end things here
@@ -163,7 +175,7 @@ bool CSplitgateStats::RefreshData(){
 }
 
 void CSplitgateStats::ParseJSON(){
-    Serial.println("Parsing JSON");
+    //Serial.println("Parsing JSON");
 
     StaticJsonDocument<144> filter;
 
@@ -178,8 +190,8 @@ void CSplitgateStats::ParseJSON(){
         DeserializationOption::Filter(filter));
 
     if (error) {
-        Serial.println("there was an error with json");
-        Serial.println(error.c_str());
+        //Serial.println("there was an error with json");
+        //Serial.println(error.c_str());
     } else {
 
         JsonArray data = doc["data"];
@@ -206,6 +218,12 @@ void CSplitgateStats::ParseJSON(){
 }
 
 void CSplitgateStats::UpdateLCD(){
+
+    static int lastUpdate = millis();
+    if (millis() < lastUpdate + 2000)
+        return;
+    lastUpdate = millis();
+
 // Figure out how much XP is needed to get to target
     const int levelDifference =
         targetLevel - PlayerData.ProgressionLevel;
@@ -221,46 +239,45 @@ void CSplitgateStats::UpdateLCD(){
         requiredXP += 50000 - (cumulativeXPPerLevelApprox * (i - 1));
     }
 
-    Serial.print("CurrentLevel: ");
-    Serial.println(PlayerData.ProgressionLevel);
+    //Serial.print("CurrentLevel: ");
+    //Serial.println(PlayerData.ProgressionLevel);
 
-    Serial.print("Current XP: ");
-    Serial.println(PlayerData.ProgressionXp);
+    //Serial.print("Current XP: ");
+    //Serial.println(PlayerData.ProgressionXp);
 
-    Serial.print("Current Kills: ");
-    Serial.println(PlayerData.OverallKills);
+    //Serial.print("Current Kills: ");
+    //Serial.println(PlayerData.OverallKills);
 
-    Serial.print("Levels Remaining: ");
-    Serial.println(levelDifference);
+    //Serial.print("Levels Remaining: ");
+    //Serial.println(levelDifference);
 
-    Serial.print("XP Remaining ( this level):");
-    Serial.println(remainingCurrentLevelXP);
-    Serial.print("XP Remaining ( whole levels):");
-    Serial.println(requiredXP);
-    Serial.print("XP Remaining ( total):");
-    Serial.println((remainingCurrentLevelXP + requiredXP));
+    //Serial.print("XP Remaining ( this level):");
+    //Serial.println(remainingCurrentLevelXP);
+    //Serial.print("XP Remaining ( whole levels):");
+    //Serial.println(requiredXP);
+    //Serial.print("XP Remaining ( total):");
+    //Serial.println((remainingCurrentLevelXP + requiredXP));
 
     static int screenState = 1;
     static int count = 0;
 
+    DisplayController.clear();
+
     switch (screenState) {
         case 0:
-            //lcd.clear();
-            //lcd.setCursor(0, 0);
-            //lcd.print("Lvl:");
-            //lcd.print(PlayerData.ProgressionLevel);
-            //lcd.print(" rem:");
-            //lcd.print(levelDifference);
-            //lcd.setCursor(0, 1);
-            //lcd.print("XPReq:");
-            //lcd.print((remainingCurrentLevelXP + requiredXP));
+            DisplayController.print("Lvl:");
+            DisplayController.print(PlayerData.ProgressionLevel);
+            DisplayController.print(" rem:");
+            DisplayController.print(levelDifference);
+            DisplayController.setCursor(0, 1);
+            DisplayController.print("XPReq:");
+            DisplayController.print((remainingCurrentLevelXP + requiredXP));
             break;
 
         case 1:
-            //lcd.clear();
-            //lcd.setCursor(0, 0);
-            //lcd.print("Kills:");
-            //lcd.print(PlayerData.OverallKills);
+            DisplayController.clear();
+            DisplayController.print("Kills:");
+            DisplayController.print(PlayerData.OverallKills);
             break;
 
         default:
@@ -268,8 +285,8 @@ void CSplitgateStats::UpdateLCD(){
     }
 
     count++;
-    if (count % 2 == 0) {
-        // screenState ++;
+    if (count % 1 == 0) {
+        screenState ++;
     }
     if (screenState > 1) {
         screenState = 0;
