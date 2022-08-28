@@ -36,7 +36,7 @@
 #define JSON_DOC_SIZE (16 * 1024)
 
 #ifndef POLLING_DELAY
-    #define POLLING_DELAY 30000
+    #define POLLING_DELAY 2500
 #endif
 
 using namespace ArduinoJson;
@@ -53,6 +53,9 @@ struct PlayerDataStruct {
     int OverallKills;
     int ProgressionXp;
     int ProgressionLevel;
+    int Teabags;
+    int Wins;
+    int Losses;
 };
 
 protected:
@@ -81,5 +84,5 @@ static StaticJsonDocument<JSON_DOC_SIZE> doc;
 static LiquidCrystal_I2C DisplayController;
 
 static PlayerDataStruct PlayerData;
-
+static PlayerDataStruct oldPlayerData;
 };

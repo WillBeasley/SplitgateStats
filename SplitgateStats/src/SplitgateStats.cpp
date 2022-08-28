@@ -13,6 +13,7 @@
 
 // Static class variables
 CSplitgateStats::PlayerDataStruct CSplitgateStats::PlayerData;
+CSplitgateStats::PlayerDataStruct CSplitgateStats::oldPlayerData;
 void* CSplitgateStats::pRxBuffer = NULL;
 int CSplitgateStats::RxBufferLen = 0;
 StaticJsonDocument<(16 * 1024)> CSplitgateStats::doc;
@@ -176,14 +177,15 @@ bool CSplitgateStats::RefreshData(){
 
 void CSplitgateStats::ParseJSON(){
     //Serial.println("Parsing JSON");
+    StaticJsonDocument<240> filter;
 
-    StaticJsonDocument<144> filter;
-
-    JsonObject filter_data_0_stats =
-        filter["data"][0].createNestedObject("stats");
+    JsonObject filter_data_0_stats = filter["data"][0].createNestedObject("stats");
+    filter_data_0_stats["kills"]["value"] = true;
     filter_data_0_stats["progressionLevel"]["value"] = true;
     filter_data_0_stats["progressionXp"]["value"] = true;
-    filter_data_0_stats["kills"]["value"] = true;
+    filter_data_0_stats["teabags"]["value"] = true;
+    filter_data_0_stats["wins"]["value"] = true;
+    filter_data_0_stats["losses"]["value"] = true;
 
     DeserializationError error = deserializeJson(
         doc, reinterpret_cast<char*>(pRxBuffer), RxBufferLen,
@@ -195,8 +197,8 @@ void CSplitgateStats::ParseJSON(){
     } else {
 
         JsonArray data = doc["data"];
-        for (JsonPair data_0_stat :
-                data[0]["stats"].as<JsonObject>()) {
+
+        for (JsonPair data_0_stat : data[0]["stats"].as<JsonObject>()) {
             const char* data_0_stat_key =
                 data_0_stat.key()
                     .c_str();  // "kills", "progressionLevel",
@@ -212,6 +214,12 @@ void CSplitgateStats::ParseJSON(){
                     data_0_stat_value_value;
             } else if (data_0_stat.key() == "progressionXp") {
                 PlayerData.ProgressionXp = data_0_stat_value_value;
+            } else if (data_0_stat.key() == "wins") {
+                PlayerData.Wins = data_0_stat_value_value;
+            } else if (data_0_stat.key() == "losses") {
+                PlayerData.Losses = data_0_stat_value_value;
+            } else if (data_0_stat.key() == "teabags") {
+                PlayerData.Teabags = data_0_stat_value_value;
             }
         }
     }
@@ -219,10 +227,15 @@ void CSplitgateStats::ParseJSON(){
 
 void CSplitgateStats::UpdateLCD(){
 
-    static int lastUpdate = millis();
-    if (millis() < lastUpdate + 2000)
+    // static int lastUpdate = millis();
+    // if (millis() < lastUpdate + 2000)
+    //     return;
+    // lastUpdate = millis();
+
+    if (memcmp(reinterpret_cast<uint8_t*>(&PlayerData),reinterpret_cast<uint8_t*>(&oldPlayerData), sizeof(PlayerDataStruct)) == 0){
         return;
-    lastUpdate = millis();
+    }
+    oldPlayerData = PlayerData;
 
 // Figure out how much XP is needed to get to target
     const int levelDifference =
@@ -258,37 +271,45 @@ void CSplitgateStats::UpdateLCD(){
     //Serial.print("XP Remaining ( total):");
     //Serial.println((remainingCurrentLevelXP + requiredXP));
 
-    static int screenState = 1;
+    static int screenState = 0;
     static int count = 0;
 
     DisplayController.clear();
 
     switch (screenState) {
         case 0:
-            DisplayController.print("Lvl:");
+            DisplayController.print("L:");
             DisplayController.print(PlayerData.ProgressionLevel);
-            DisplayController.print(" rem:");
-            DisplayController.print(levelDifference);
-            DisplayController.setCursor(0, 1);
-            DisplayController.print("XPReq:");
+            //DisplayController.print(" ");
+            //DisplayController.print(levelDifference);            
+            DisplayController.print(" XpR:");
             DisplayController.print((remainingCurrentLevelXP + requiredXP));
+            
+
+            DisplayController.setCursor(0, 1);
+            DisplayController.print("K:");
+            DisplayController.print(PlayerData.OverallKills);
+
+            DisplayController.print(" T:");
+            DisplayController.print(PlayerData.Teabags);
+
             break;
 
-        case 1:
-            DisplayController.clear();
-            DisplayController.print("Kills:");
-            DisplayController.print(PlayerData.OverallKills);
-            break;
+        // case 1:
+        //     DisplayController.clear();
+        //     DisplayController.print("Kills:");
+        //     DisplayController.print(PlayerData.OverallKills);
+        //     break;
 
         default:
             break;
     }
 
-    count++;
-    if (count % 1 == 0) {
-        screenState ++;
-    }
-    if (screenState > 1) {
-        screenState = 0;
-    }
+    // count++;
+    // if (count % 1 == 0) {
+    //     screenState ++;
+    // }
+    // if (screenState > 1) {
+    //     screenState = 0;
+    // }
 }
